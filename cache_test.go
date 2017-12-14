@@ -1677,6 +1677,60 @@ func BenchmarkDeleteExpiredLoop(b *testing.B) {
 	}
 }
 
+func TestGetWithRefresh(t *testing.T) {
+	tc := New(DefaultExpiration, 0)
+
+	a, found := tc.GetAndRefresh("a")
+	if found || a != nil {
+		t.Error("Getting A found value that shouldn't exist:", a)
+	}
+
+	tc.Set("a", 1, 70*time.Millisecond)
+
+	<-time.After(50 * time.Millisecond)
+
+	_, found = tc.GetAndRefresh("a")
+
+	if !found {
+		t.Error("Getting A not found even though expiration was set longer")
+	}
+
+	<-time.After(50 * time.Millisecond)
+
+	_, found = tc.Get("a")
+
+	if !found {
+		t.Error("Getting A not found even though expiration was set longer")
+	}
+
+	<-time.After(50 * time.Millisecond)
+
+	_, found = tc.Get("a")
+	if found {
+		t.Error("Getting A found even though it should have been deleted")
+	}
+
+}
+
+func TestMaxSize(t *testing.T) {
+	tc := NewWithMaximumSize(DefaultExpiration, 0, 2)
+
+	err := tc.Set("a", 1, NoExpiration)
+	if err != nil {
+		t.Error("Failed to insert a even though size was greater")
+	}
+
+	err = tc.Set("b", 9, NoExpiration)
+	if err != nil {
+		t.Error("Failed to insert b even though size was greater")
+	}
+
+	err = tc.Set("c", 4, DefaultExpiration)
+	if err == nil {
+		t.Error("Set c even though max size was reached")
+	}
+}
+
 func TestGetWithExpiration(t *testing.T) {
 	tc := New(DefaultExpiration, 0)
 
